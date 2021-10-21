@@ -1,6 +1,6 @@
 import requests
-import time as t
 import pickle
+import json
 
 with open('cor_dict.pickle', 'rb') as f:
     cor_dict = pickle.load(f)
@@ -11,25 +11,18 @@ with open('node_dict.pickle', 'rb') as f:
 with open('graph.pickle', 'rb') as f:
     graph = pickle.load(f)
 
-# origin = '127.13144306487084, 37.44134209110179'
-# des = '127.14112393388389, 37.44558371517034'
+API_KEY_LIST = [...]
+INDEX = 0
+
+f = open('API_LOG.txt', 'w')
 
 
 def distancAPI(origin, des) -> dict:
     query = {'origin': origin, 'destination': des, 'priority': 'DISTANCE', 'road_details': True}
-    errCount = 0
-    while True:
-        try:
-            response = requests.get("https://apis-navi.kakaomobility.com/v1/directions", params=query,  headers={'Authorization': 'KakaoAK 	?????', 'Content-Type': 'application/json'})
-            myJson = response.json()
-        except TimeoutError:
-            print("CONNECTION ERR ..... retry after 30sec")
-            t.sleep(30)
-            errCount += 1
-            if errCount > 10:
-                raise KeyError("TimeOut!!")
-            continue
-        break
+
+    HEADER = {'Authorization': f'KakaoAK {API_KEY_LIST[INDEX]}', 'Content-Type': 'application/json'}
+    response = requests.get("https://apis-navi.kakaomobility.com/v1/directions", params=query, headers=HEADER)
+    myJson = response.json()
 
     resultCode = myJson['routes'][0]['result_code']  # raise keyerr
     if resultCode != 0:
@@ -50,27 +43,49 @@ def distancAPI(origin, des) -> dict:
     return distance, time, road_dist
 
 
-dist_matrix = [[0 for _ in range(7551)] for _ in range(7551)]
+weighted_graph = [[0 for _ in range(7551)] for _ in range(7551)]
 time_matrix = [[0 for _ in range(7551)] for _ in range(7551)]
 road_matrix = [[None for _ in range(7551)] for _ in range(7551)]
 
+flag = 0
 for i in range(7550, -1, -1):
+    if flag == 1:
+        break
     for j in range(7550, -1, -1):
+        if flag == 1:
+            break
         if graph[i][j] == 1:
-            start = ', '.join(map(str, node_dict[i+1][::-1]))
-            end = ', '.join(map(str, node_dict[j+1][::-1]))
+            start = ', '.join(map(str, node_dict[i + 1][::-1]))
+            end = ', '.join(map(str, node_dict[j + 1][::-1]))
 
-            try:
-                distance, time, road_dist = distancAPI(start, end)  # raise KeyErr if fail
-                print(i, j, distance, time, road_dist)
-                dist_matrix[i][j] = distance
-                time_matrix[i][j] = time
-                road_matrix[i][j] = road_dist
-            except KeyError:
-                print("REQUEST FAILED...", i, j)
-                with open("graphWeights.pickle", "wb") as fw:
-                    pickle.dump(dist_matrix, fw)
-                with open("time_matrix.pickle", "wb") as fw:
-                    pickle.dump(time_matrix, fw)
-                with open("road_matrix.pickle", "wb") as fw:
-                    pickle.dump(road_matrix, fw)
+            while True:
+                try:
+                    distance, time, road_dist = distancAPI(start, end)  # throw KeyErr if fail
+                    print(i, j, distance, time, road_dist)
+
+                    myRoad: str = json.dumps(road_dist) if len(road_dist) else '{}'
+                    f.write(f"{i}, {j}, {distance}, {time}, {myRoad}\n")
+                    f.flush()
+
+                    weighted_graph[i][j] = distance
+                    time_matrix[i][j] = time
+                    road_matrix[i][j] = road_dist
+                except KeyError:
+                    print("REQUEST FAILED...", i, j)
+                    f.write(f"REQUEST FAILED at {i}, {j}\n")
+                    f.flush()
+                    print("----------------------")
+                    INDEX = INDEX + 1 if INDEX < 8 else INDEX
+                    if INDEX > 7:  # if 8
+                        flag = 1
+                        break
+                    continue
+                break
+
+with open("distanceWeightedGraph.pkl", "wb") as fw:
+    pickle.dump(weighted_graph, fw)
+with open("timeWeightedGraph.pkl", "wb") as fw:
+    pickle.dump(time_matrix, fw)
+with open("road_matrix.pickle.pkl", "wb") as fw:
+    pickle.dump(road_matrix, fw)
+f.close()
