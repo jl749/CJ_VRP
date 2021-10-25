@@ -1,68 +1,30 @@
 from urllib.parse import quote_plus, urlencode
 from urllib.request import urlopen, Request
-import xml.etree.ElementTree as ET
 import json
 
-print('도로명주소 검색API 서비스를 이용한 주소검색결과를 보여줍니다.')
-keystr = input('검색어를 입력하세요. : ')
 
-resulttype = 'json'
-# resulttype = 'xml'
+def jusoAPI(keystr):
+    if '오산시' in keystr:
+        return None
+    key_list = list(keystr.split())
+    for i in range(len(key_list), 3, -1):
+        addr = ' '.join(key_list[:i])
+        url = 'http://www.juso.go.kr/addrlink/addrLinkApi.do'
+        queryParams = '?' + urlencode(
+            {quote_plus('currentPage'): '1', quote_plus('countPerPage'): '1', quote_plus('resultType'): 'json',
+             quote_plus('keyword'): addr, quote_plus('confmKey'): 'devU01TX0FVVEgyMDIxMTAwMjIzNDkxMzExMTcxNDg='})
+        while True:
+            try:
+                request = Request(url + queryParams)
+                request.get_method = lambda: 'GET'  # default GET anyway
+                response_body = urlopen(request).read()
+                break
+            except:
+                continue
 
-url = 'http://www.juso.go.kr/addrlink/addrLinkApi.do'
-queryParams = '?' + urlencode(
-    {quote_plus('currentPage'): '1', quote_plus('countPerPage'): '10', quote_plus('resultType'): resulttype,
-     quote_plus('keyword'): keystr, quote_plus('confmKey'): 'devU01TX0FVVEgyMDIxMTAwMjIzNDkxMzExMTcxNDg='})
-
-print(url + queryParams)
-request = Request(url + queryParams)
-request.get_method = lambda: 'GET'  # default GET anyway
-response_body = urlopen(request).read()
-
-print(response_body.decode('utf-8'))  # whole returned query
-
-print("url = " + url)
-print("keyword = " + keystr)
-print("=" * 100)
-
-if resulttype == 'json':
-    root_json = json.loads(response_body)
-    print('<< results >>')
-    print('totalCount   : ' + root_json['results']['common']['totalCount'])
-    print('currentPage  : ' + root_json['results']['common']['currentPage'])
-    print('countPerPage : ' + root_json['results']['common']['countPerPage'])
-    print('errorCode    : ' + root_json['results']['common']['errorCode'])
-    print('errorMessage : ' + root_json['results']['common']['errorMessage'])
-    for child in root_json['results']['juso']:
-        print('-' * 100)
-        print('[' + child['zipNo'] + '] ' + child['roadAddr'])
-        print('    지번주소     = ' + child['jibunAddr'])
-        print('    영문주소     = ' + child['engAddr'])
-        print('    도로명코드   = ' + child['rnMgtSn'])
-        print('    건물관리번호 = ' + child['bdMgtSn'])
-        print('    법정동코드   = ' + child['admCd'])
-        print('    상세건물명   = ' + child['detBdNmList'])
-        print('')
-
-
-else:
-    root_xml = ET.fromstring(response_body)
-
-    print('<< ' + root_xml.tag + ' >>')
-
-    print('totalCount   : ' + root_xml.find('common').findtext('totalCount'))
-    print('currentPage  : ' + root_xml.find('common').findtext('currentPage'))
-    print('countPerPage : ' + root_xml.find('common').findtext('countPerPage'))
-    print('errorCode    : ' + root_xml.find('common').findtext('errorCode'))
-    print('errorMessage : ' + root_xml.find('common').findtext('errorMessage'))
-
-    for child in root_xml.findall('juso'):
-        print('-' * 100)
-        print('[' + child.findtext('zipNo') + '] ' + child.findtext('roadAddr'))
-        print('    지번주소     = ' + child.findtext('jibunAddr'))
-        print('    영문주소     = ' + child.findtext('engAddr'))
-        print('    도로명코드   = ' + child.findtext('rnMgtSn'))
-        print('    건물관리번호 = ' + child.findtext('bdMgtSn'))
-        print('    법정동코드   = ' + child.findtext('admCd'))
-        print('    상세건물명   = ' + child.findtext('detBdNmList'))
-        print('')
+        root_json = json.loads(response_body)
+        total = root_json['results']['common']['totalCount']
+        if total != '0':
+            ad = root_json['results']['juso'][0]
+            return ad['roadAddr']  # ['detBdNmList']
+    return None
