@@ -2,16 +2,26 @@ import requests
 import pickle
 import json
 
-with open('cor_dict.pickle', 'rb') as f:
+with open('cor_dict.pkl', 'rb') as f:
     cor_dict = pickle.load(f)
 
-with open('node_dict.pickle', 'rb') as f:
+with open('node_dict.pkl', 'rb') as f:
     node_dict = pickle.load(f)
 
-with open('graph.pickle', 'rb') as f:
+with open('graph.pkl', 'rb') as f:
     graph = pickle.load(f)
 
-API_KEY_LIST = [...]
+# 신하섬 62e08eb099c720a9a6b8ce429285b169
+# 강병국 a11962d0038edfb6f73799c64cf008db
+# 강태환 af39952532715711ee099595385810d0
+# 이정무 caefff050a36c52cbc463eab75b6a31d
+# 천영성 7a57f2b24d51a22d76d3f9df996a1a98
+# 전세현 fd8116edb66e85eabf70a3bd1de826d4
+
+API_KEY_LIST = ['62e08eb099c720a9a6b8ce429285b169', 'a11962d0038edfb6f73799c64cf008db',
+                'af39952532715711ee099595385810d0', 'fd8116edb66e85eabf70a3bd1de826d4',
+                'caefff050a36c52cbc463eab75b6a31d', '7a57f2b24d51a22d76d3f9df996a1a98',
+                '68666720352f90cec83ad6691b3777e3', 'f0db6152b170ce7b5bec9a29aee71597']
 INDEX = 0
 
 f = open('API_LOG.txt', 'w')
@@ -86,6 +96,6 @@ with open("distanceWeightedGraph.pkl", "wb") as fw:
     pickle.dump(weighted_graph, fw)
 with open("timeWeightedGraph.pkl", "wb") as fw:
     pickle.dump(time_matrix, fw)
-with open("road_matrix.pickle.pkl", "wb") as fw:
+with open("road_matrix.pkl", "wb") as fw:
     pickle.dump(road_matrix, fw)
 f.close()

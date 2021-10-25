@@ -1,89 +1,107 @@
-"""Simple Vehicles Routing Problem (VRP).
+import json
+import pickle
+from typing import List
 
-   This is a sample using the routing library python wrapper to solve a VRP
-   problem.
-   A description of the problem can be found here:
-   http://en.wikipedia.org/wiki/Vehicle_routing_problem.
-
-   Distances are in meters.
-"""
-
+import requests
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
+# API_KEY_LIST = ['62e08eb099c720a9a6b8ce429285b169', 'a11962d0038edfb6f73799c64cf008db',
+#                 'af39952532715711ee099595385810d0', 'fd8116edb66e85eabf70a3bd1de826d4',
+#                 'caefff050a36c52cbc463eab75b6a31d', '7a57f2b24d51a22d76d3f9df996a1a98',
+#                 '68666720352f90cec83ad6691b3777e3', 'f0db6152b170ce7b5bec9a29aee71597']
+API_KEY = '62e08eb099c720a9a6b8ce429285b169'
 
-def create_data_model():
-    """Stores the data for the problem."""
-    data = {'distance_matrix': [
-        [
-            0, 548, 776, 696, 582, 274, 502, 194, 308, 194, 536, 502, 388, 354,
-            468, 776, 662
-        ],
-        [
-            548, 0, 684, 308, 194, 502, 730, 354, 696, 742, 1084, 594, 480, 674,
-            1016, 868, 1210
-        ],
-        [
-            776, 684, 0, 992, 878, 502, 274, 810, 468, 742, 400, 1278, 1164,
-            1130, 788, 1552, 754
-        ],
-        [
-            696, 308, 992, 0, 114, 650, 878, 502, 844, 890, 1232, 514, 628, 822,
-            1164, 560, 1358
-        ],
-        [
-            582, 194, 878, 114, 0, 536, 764, 388, 730, 776, 1118, 400, 514, 708,
-            1050, 674, 1244
-        ],
-        [
-            274, 502, 502, 650, 536, 0, 228, 308, 194, 240, 582, 776, 662, 628,
-            514, 1050, 708
-        ],
-        [
-            502, 730, 274, 878, 764, 228, 0, 536, 194, 468, 354, 1004, 890, 856,
-            514, 1278, 480
-        ],
-        [
-            194, 354, 810, 502, 388, 308, 536, 0, 342, 388, 730, 468, 354, 320,
-            662, 742, 856
-        ],
-        [
-            308, 696, 468, 844, 730, 194, 194, 342, 0, 274, 388, 810, 696, 662,
-            320, 1084, 514
-        ],
-        [
-            194, 742, 742, 890, 776, 240, 468, 388, 274, 0, 342, 536, 422, 388,
-            274, 810, 468
-        ],
-        [
-            536, 1084, 400, 1232, 1118, 582, 354, 730, 388, 342, 0, 878, 764,
-            730, 388, 1152, 354
-        ],
-        [
-            502, 594, 1278, 514, 400, 776, 1004, 468, 810, 536, 878, 0, 114,
-            308, 650, 274, 844
-        ],
-        [
-            388, 480, 1164, 628, 514, 662, 890, 354, 696, 422, 764, 114, 0, 194,
-            536, 388, 730
-        ],
-        [
-            354, 674, 1130, 822, 708, 628, 856, 320, 662, 388, 730, 308, 194, 0,
-            342, 422, 536
-        ],
-        [
-            468, 1016, 788, 1164, 1050, 514, 514, 662, 320, 274, 388, 650, 536,
-            342, 0, 764, 194
-        ],
-        [
-            776, 868, 1552, 560, 674, 1050, 1278, 742, 1084, 810, 1152, 274,
-            388, 422, 764, 0, 798
-        ],
-        [
-            662, 1210, 754, 1358, 1244, 708, 480, 856, 514, 468, 354, 844, 730,
-            536, 194, 798, 0
-        ],
-    ], 'num_vehicles': 4, 'depot': 0}
+with open('cor_dict.pkl', 'rb') as f:
+    COR_DICT = pickle.load(f)
+with open('time_matrix.pkl', 'rb') as f:
+    DISTANCE_MATRIX = pickle.load(f)
+LON_GAP = 0.0033806626098715348 / 2
+LAT_GAP = 0.0027283023109409563 / 2
+
+
+def ads_to_nodes(addresses: List[str]) -> List[int]:
+    """
+    convert String addresses to the most appropriate Node numbers (nearest neighbour)
+    :param addresses: list of String addresses
+    :return: list of converted Node nums
+    """
+    count = 1
+    nodeList = []
+    for i, ad in enumerate(addresses):
+        try:
+            print(f'{count} addresses converted', end=' --> ')
+            lat, lon = _getLatLng(ad)
+            count += 1
+            for cor, node in COR_DICT.items():
+                if cor[0] - LAT_GAP <= lat <= cor[0] + LAT_GAP and cor[1] - LON_GAP <= lon <= cor[1] + LON_GAP:
+                    nodeList.append(node)
+                    break
+
+        except IndexError:
+            print(f'wrong address format at index {i}:{ad}')
+            continue
+        except TypeError:
+            print(f'wrong address format at index {i}:{ad}')
+            continue
+        except ConnectionError:
+            print('### CONNECTION ERROR ###')
+            break
+
+    return nodeList
+
+
+def _getLatLng(addr):
+    url = 'https://dapi.kakao.com/v2/local/search/address.json?query=' + addr
+    HEADER = {'Authorization': f'KakaoAK {API_KEY}', 'Content-Type': 'application/json'}
+    result = json.loads(str(requests.get(url, headers=HEADER).text))
+    status_code = requests.get(url, headers=HEADER).status_code
+    if status_code != 200:
+        raise ConnectionError(f"ERROR: Unable to call rest api, http_status_code: {status_code}")
+
+    try:
+        match_first = result['documents'][0]['address']
+
+        lon: float = float(match_first['x'])
+        lat: float = float(match_first['y'])
+        print((lat, lon))
+        return lat, lon
+    except IndexError:  # match 값이 없을때
+        raise IndexError(f"주소를 찾을수 없습니다\n정확한 주소를 입력해주세요 {addr}")
+    except TypeError:  # match 값이 2개이상일때
+        raise TypeError(f"하나이상의 좌표값이 리턴되었습니다\n정확한 주소를 입력해주세요 {addr}")
+
+
+def nodeDistMatrix(today_nodes: List[int]) -> List[List[float]]:
+    """
+    extract n x n matrix from the distance_matrix
+    n = today's delivery points
+    :param today_nodes: today delivery nodes
+    :return: today distance matrix (n x n)
+    """
+    today_nodes = list(map(lambda a: a - 1, today_nodes))  # 노드 번호 인덱스 값으로 변경
+    today_nodes.sort()
+    today_nodes.insert(0, today_nodes.pop(today_nodes.index(5270)))  # 물류센터 노드를 시작 노드로 설정
+
+    # today_matrix 작성
+    today_matrix = []
+    for i in range(len(today_nodes)):
+        tmp = []
+        for j in range(len(today_nodes)):
+            tmp.append( DISTANCE_MATRIX[today_nodes[i]][today_nodes[j]] )
+        today_matrix.append(tmp)
+
+    return today_matrix
+
+
+def create_data_model(today_matrix, num_vehicles):
+    """
+    Stores the data for the problem
+    :param today_matrix: n x n today_matrix
+    :param num_vehicles: number of vehicles to be used in VRP
+    :return: data dictionary
+    """
+    data = {'distance_matrix': today_matrix, 'num_vehicles': num_vehicles, 'depot': 0}
     return data
 
 
@@ -108,10 +126,10 @@ def print_solution(data, manager, routing, solution):
     print('Maximum of the route distances: {}m'.format(max_route_distance))
 
 
-def main():
+def main(today_matrix, num_vehicles: int):
     """Entry point of the program."""
     # Instantiate the data problem.
-    data = create_data_model()
+    data = create_data_model(today_matrix, num_vehicles)
 
     # Create the routing index manager.
     manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']),
@@ -138,7 +156,7 @@ def main():
     routing.AddDimension(
         transit_callback_index,
         0,  # no slack
-        5000,  # vehicle maximum travel distance   -->   https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiq6dL2h7DzAhVhLqYKHSdIAqkQFnoECAYQAQ&url=https%3A%2F%2Fwww.labors.or.kr%2Fdownload%3Ffilename%3D%5B%25EC%25B5%259C%25EC%25A2%2585%25EB%25B3%25B4%25EA%25B3%25A0%25EC%2584%259C%5D%25EC%2584%259C%25EC%259A%25B8%25EC%25A7%2580%25EC%2597%25AD%2520%25ED%2583%259D%25EB%25B0%25B0%25EA%25B8%25B0%25EC%2582%25AC%2520%25EC%258B%25A4%25ED%2583%259C%25EC%25A1%25B0%25EC%2582%25AC.pdf%26src%3Dfile_20190102181653.pdf%26board_code%3D0&usg=AOvVaw0wLDUnh6a8cnALXOq8C9Tk
+        28800,  # 근로기준법 1일 근로시간 = 8시간
         True,  # start cumul to zero
         dimension_name)
     distance_dimension = routing.GetDimensionOrDie(dimension_name)
@@ -160,4 +178,12 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # ad_list = [...]
+    # node_list = ads_to_nodes(ad_list)
+
+    f = open('test_node_list.pkl', 'r')
+    TEST_NODE_LIST = pickle.load(f)
+    f.close()
+
+    dist_matrix = nodeDistMatrix(TEST_NODE_LIST)
+    main(dist_matrix, 86)
