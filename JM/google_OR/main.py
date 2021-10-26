@@ -129,18 +129,23 @@ def print_solution(data, manager, routing, solution):
     """Prints solution on console."""
     print(f'Objective: {solution.ObjectiveValue()}')
     max_route_distance = 0
+
+    result = dict()
+
     for vehicle_id in range(data['num_vehicles']):
+        result[vehicle_id] = []
         index = routing.Start(vehicle_id)
         plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
         route_distance = 0
         while not routing.IsEnd(index):
             node_label = columns_list[manager.IndexToNode(index)]
             tmp = nodesWithAds[node_label] if node_label != START_NODE else [f'물류센터 {START_NODE}']
-            node_num = nodeCount[node_label] if node_label != START_NODE else 1
+
+            if isinstance(tmp[0], int):
+                result[vehicle_id].append(tmp[0])
 
             plan_output += ' {} -> '.format( tmp[0] )
-            for i in range(1, node_num):
-                plan_output += ' {} -> '.format(tmp[i])
+
             previous_index = index
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(
@@ -152,8 +157,10 @@ def print_solution(data, manager, routing, solution):
         max_route_distance = max(route_distance, max_route_distance)
     print('Maximum of the route distances: {} seconds'.format(max_route_distance))
 
+    return result
 
-def main(today_matrix, num_vehicles: int):
+
+def find_route(today_matrix, num_vehicles: int):
     """Entry point of the program."""
     # Instantiate the data problem.
     data = create_data_model(today_matrix, num_vehicles)
@@ -199,9 +206,10 @@ def main(today_matrix, num_vehicles: int):
 
     # Print solution on console.
     if solution:
-        print_solution(data, manager, routing, solution)
+        return print_solution(data, manager, routing, solution)
     else:
         print('No solution found !')
+        return None
 
 
 if __name__ == '__main__':
@@ -221,4 +229,12 @@ if __name__ == '__main__':
     columns_list = list(nodeCount.keys())
     columns_list.insert(0, START_NODE)  # [START_NODE, ........ nodes ...........]
 
-    main(node_matrix, 5)
+    result = find_route(node_matrix, 5)
+    with open('result.txt', 'wt') as f:
+        for key, item in result.items():
+            f.write(f'vehicle {key}\n')
+            f.write(f'물류센터 {START_NODE}, ')
+
+            for ad in item:
+                f.write(f'{ad_list[ad]}, ')
+            f.write(f'물류센터 {START_NODE}\n')
