@@ -1,7 +1,9 @@
 import json
 import pickle
-from typing import List
-
+from collections import OrderedDict
+from typing import List, Dict
+import numpy as np
+import pandas as pd
 import requests
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
@@ -20,22 +22,26 @@ LON_GAP = 0.0033806626098715348 / 2
 LAT_GAP = 0.0027283023109409563 / 2
 
 
-def ads_to_nodes(addresses: List[str]) -> List[int]:
+def ads_to_nodes(addresses: List[str]) -> Dict[int, List[int]]:
     """
     convert String addresses to the most appropriate Node numbers (nearest neighbour)
     :param addresses: list of String addresses
-    :return: list of converted Node nums
+    :return: Dictionary of converted Node nums with address indexes
     """
     count = 1
-    nodeList = []
+    nodesWithAds = dict()
     for i, ad in enumerate(addresses):
         try:
             print(f'{count} addresses converted', end=' --> ')
             lat, lon = _getLatLng(ad)
             count += 1
+
             for cor, node in COR_DICT.items():
                 if cor[0] - LAT_GAP <= lat <= cor[0] + LAT_GAP and cor[1] - LON_GAP <= lon <= cor[1] + LON_GAP:
-                    nodeList.append(node)
+                    if node not in nodesWithAds:
+                        nodesWithAds[node] = [i]
+                    else:
+                        nodesWithAds[node].append(i)
                     break
 
         except IndexError:
@@ -48,7 +54,7 @@ def ads_to_nodes(addresses: List[str]) -> List[int]:
             print('### CONNECTION ERROR ###')
             break
 
-    return nodeList
+    return nodesWithAds
 
 
 def _getLatLng(addr):
@@ -72,26 +78,33 @@ def _getLatLng(addr):
         raise TypeError(f"하나이상의 좌표값이 리턴되었습니다\n정확한 주소를 입력해주세요 {addr}")
 
 
-def nodeDistMatrix(today_nodes: List[int]) -> List[List[float]]:
+def nodeDistMatrix(today_nodes: List[int]):
     """
     extract n x n matrix from the distance_matrix
     n = today's delivery points
     :param today_nodes: today delivery nodes
-    :return: today distance matrix (n x n)
+    :return: today distance matrix (n x n), nodeCount: Dict[int, int]
     """
+    nodeCount = OrderedDict()
+
+    today_nodes = list(set(today_nodes))  # no duplicate
     today_nodes = list(map(lambda a: a - 1, today_nodes))  # 노드 번호 인덱스 값으로 변경
     today_nodes.sort()
-    today_nodes.insert(0, today_nodes.pop(today_nodes.index(5270)))  # 물류센터 노드를 시작 노드로 설정
+
+    for element in sorted(list(set(today_nodes))):
+        nodeCount[element+1] = today_nodes.count(element)
+
+    today_nodes.insert(0, 5270)  # 물류센터 노드를 시작 노드에 더함
 
     # today_matrix 작성
     today_matrix = []
     for i in range(len(today_nodes)):
         tmp = []
         for j in range(len(today_nodes)):
-            tmp.append( DISTANCE_MATRIX[today_nodes[i]][today_nodes[j]] )
+            tmp.append(DISTANCE_MATRIX[today_nodes[i]][today_nodes[j]])
         today_matrix.append(tmp)
 
-    return today_matrix
+    return today_matrix, nodeCount
 
 
 def create_data_model(today_matrix, num_vehicles):
@@ -114,13 +127,20 @@ def print_solution(data, manager, routing, solution):
         plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
         route_distance = 0
         while not routing.IsEnd(index):
-            plan_output += ' {} -> '.format(manager.IndexToNode(index))
+            node_label = columns_list[manager.IndexToNode(index)]
+            tmp = nodesWithAds[node_label] if node_label != 5271 else ['화성물류센터']
+            node_num = nodeCount[node_label] if node_label != 5271 else 1
+
+            plan_output += ' {} -> '.format( tmp[0] )
+            for i in range(1, node_num):
+                plan_output += ' {} -> '.format(tmp[i])
             previous_index = index
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(
                 previous_index, index, vehicle_id)
-        plan_output += '{}\n'.format(manager.IndexToNode(index))
-        plan_output += 'Distance of the route: {}m\n'.format(route_distance)
+        # plan_output += '{}\n'.format(manager.IndexToNode(index))
+        plan_output += '{}\n'.format('화성물류센터')
+        plan_output += 'Distance of the route: {}seconds\n'.format(route_distance)
         print(plan_output)
         max_route_distance = max(route_distance, max_route_distance)
     print('Maximum of the route distances: {}m'.format(max_route_distance))
@@ -155,7 +175,7 @@ def main(today_matrix, num_vehicles: int):
     dimension_name = 'Distance'
     routing.AddDimension(
         transit_callback_index,
-        0,  # no slack
+        300,  # 5 min each delivery
         28800,  # 근로기준법 1일 근로시간 = 8시간
         True,  # start cumul to zero
         dimension_name)
@@ -178,12 +198,20 @@ def main(today_matrix, num_vehicles: int):
 
 
 if __name__ == '__main__':
-    # ad_list = [...]
-    # node_list = ads_to_nodes(ad_list)
+    df = pd.read_csv('sample_300.csv')
+    ad_list: List[str] = df['받는분주소'].sample(n=100, random_state=1).values
 
-    f = open('test_node_list.pkl', 'r')
-    TEST_NODE_LIST = pickle.load(f)
-    f.close()
+    nodesWithAds: Dict[int, List[int]] = ads_to_nodes(ad_list)
 
-    dist_matrix = nodeDistMatrix(TEST_NODE_LIST)
-    main(dist_matrix, 86)
+    with open('nodesWithAds.pkl', 'wb') as f:
+        pickle.dump(nodesWithAds, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open('nodesWithAds.pkl', 'rb') as f:
+    #     nodesWithAds = pickle.load(f)
+
+    my_nodes = list(nodesWithAds.keys())
+    node_matrix, nodeCount = nodeDistMatrix(my_nodes)  # nodeCount: OrderedDict[int, int]
+
+    columns_list = list(nodeCount.keys())
+    columns_list.insert(0, 5271)  # [5271, ........ nodes ...........]
+
+    main(node_matrix, 5)
