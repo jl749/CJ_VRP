@@ -2,16 +2,12 @@ import json
 import pickle
 from collections import OrderedDict
 from typing import List, Dict
-import numpy as np
+
 import pandas as pd
 import requests
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
-# API_KEY_LIST = ['62e08eb099c720a9a6b8ce429285b169', 'a11962d0038edfb6f73799c64cf008db',
-#                 'af39952532715711ee099595385810d0', 'fd8116edb66e85eabf70a3bd1de826d4',
-#                 'caefff050a36c52cbc463eab75b6a31d', '7a57f2b24d51a22d76d3f9df996a1a98',
-#                 '68666720352f90cec83ad6691b3777e3', 'f0db6152b170ce7b5bec9a29aee71597']
 API_KEY = '62e08eb099c720a9a6b8ce429285b169'
 
 with open('cor_dict.pkl', 'rb') as f:
@@ -20,6 +16,9 @@ with open('time_matrix.pkl', 'rb') as f:
     DISTANCE_MATRIX = pickle.load(f)
 LON_GAP = 0.0033806626098715348 / 2
 LAT_GAP = 0.0027283023109409563 / 2
+
+# START_NODE = 5271  # 오산시 물류센터
+START_NODE = 3630  # 화성시 물류센터
 
 
 def ads_to_nodes(addresses: List[str]) -> Dict[int, List[int]]:
@@ -30,11 +29,16 @@ def ads_to_nodes(addresses: List[str]) -> Dict[int, List[int]]:
     """
     count = 1
     nodesWithAds = dict()
+
+    adsWithCor = dict()
+
     for i, ad in enumerate(addresses):
         try:
             print(f'{count} addresses converted', end=' --> ')
             lat, lon = _getLatLng(ad)
             count += 1
+
+            adsWithCor[i] = (lat, lon)
 
             for cor, node in COR_DICT.items():
                 if cor[0] - LAT_GAP <= lat <= cor[0] + LAT_GAP and cor[1] - LON_GAP <= lon <= cor[1] + LON_GAP:
@@ -53,6 +57,9 @@ def ads_to_nodes(addresses: List[str]) -> Dict[int, List[int]]:
         except ConnectionError:
             print('### CONNECTION ERROR ###')
             break
+
+    with open('adsWithCor.pkl', 'wb') as f:
+        pickle.dump(adsWithCor, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     return nodesWithAds
 
@@ -94,7 +101,7 @@ def nodeDistMatrix(today_nodes: List[int]):
     for element in sorted(list(set(today_nodes))):
         nodeCount[element+1] = today_nodes.count(element)
 
-    today_nodes.insert(0, 5270)  # 물류센터 노드를 시작 노드에 더함
+    today_nodes.insert(0, START_NODE - 1)  # 물류센터 노드를 시작 노드에 더함
 
     # today_matrix 작성
     today_matrix = []
@@ -128,8 +135,8 @@ def print_solution(data, manager, routing, solution):
         route_distance = 0
         while not routing.IsEnd(index):
             node_label = columns_list[manager.IndexToNode(index)]
-            tmp = nodesWithAds[node_label] if node_label != 5271 else ['화성물류센터']
-            node_num = nodeCount[node_label] if node_label != 5271 else 1
+            tmp = nodesWithAds[node_label] if node_label != START_NODE else [f'물류센터 {START_NODE}']
+            node_num = nodeCount[node_label] if node_label != START_NODE else 1
 
             plan_output += ' {} -> '.format( tmp[0] )
             for i in range(1, node_num):
@@ -139,11 +146,11 @@ def print_solution(data, manager, routing, solution):
             route_distance += routing.GetArcCostForVehicle(
                 previous_index, index, vehicle_id)
         # plan_output += '{}\n'.format(manager.IndexToNode(index))
-        plan_output += '{}\n'.format('화성물류센터')
-        plan_output += 'Distance of the route: {}seconds\n'.format(route_distance)
+        plan_output += '{}\n'.format(f'물류센터 {START_NODE}')
+        plan_output += 'Distance of the route: {} seconds\n'.format(route_distance)
         print(plan_output)
         max_route_distance = max(route_distance, max_route_distance)
-    print('Maximum of the route distances: {}m'.format(max_route_distance))
+    print('Maximum of the route distances: {} seconds'.format(max_route_distance))
 
 
 def main(today_matrix, num_vehicles: int):
@@ -203,8 +210,8 @@ if __name__ == '__main__':
 
     nodesWithAds: Dict[int, List[int]] = ads_to_nodes(ad_list)
 
-    with open('nodesWithAds.pkl', 'wb') as f:
-        pickle.dump(nodesWithAds, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open('nodesWithAds.pkl', 'wb') as f:
+    #     pickle.dump(nodesWithAds, f, protocol=pickle.HIGHEST_PROTOCOL)
     # with open('nodesWithAds.pkl', 'rb') as f:
     #     nodesWithAds = pickle.load(f)
 
@@ -212,6 +219,6 @@ if __name__ == '__main__':
     node_matrix, nodeCount = nodeDistMatrix(my_nodes)  # nodeCount: OrderedDict[int, int]
 
     columns_list = list(nodeCount.keys())
-    columns_list.insert(0, 5271)  # [5271, ........ nodes ...........]
+    columns_list.insert(0, START_NODE)  # [START_NODE, ........ nodes ...........]
 
     main(node_matrix, 5)
