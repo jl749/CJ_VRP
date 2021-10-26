@@ -236,5 +236,5 @@ if __name__ == '__main__':
             f.write(f'물류센터 {START_NODE}, ')
 
             for ad in item:
-                f.write(f'{ad_list[ad]}, ')
+                f.write(f'\'{ad_list[ad]}\', ')
             f.write(f'물류센터 {START_NODE}\n')
