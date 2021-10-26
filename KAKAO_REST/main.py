@@ -11,12 +11,6 @@ with open('node_dict.pkl', 'rb') as f:
 with open('graph.pkl', 'rb') as f:
     graph = pickle.load(f)
 
-# 신하섬 62e08eb099c720a9a6b8ce429285b169
-# 강병국 a11962d0038edfb6f73799c64cf008db
-# 강태환 af39952532715711ee099595385810d0
-# 이정무 caefff050a36c52cbc463eab75b6a31d
-# 천영성 7a57f2b24d51a22d76d3f9df996a1a98
-# 전세현 fd8116edb66e85eabf70a3bd1de826d4
 
 API_KEY_LIST = ['62e08eb099c720a9a6b8ce429285b169', 'a11962d0038edfb6f73799c64cf008db',
                 'af39952532715711ee099595385810d0', 'fd8116edb66e85eabf70a3bd1de826d4',
