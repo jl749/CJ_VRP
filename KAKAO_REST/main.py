@@ -12,10 +12,7 @@ with open('graph.pkl', 'rb') as f:
     graph = pickle.load(f)
 
 
-API_KEY_LIST = ['62e08eb099c720a9a6b8ce429285b169', 'a11962d0038edfb6f73799c64cf008db',
-                'af39952532715711ee099595385810d0', 'fd8116edb66e85eabf70a3bd1de826d4',
-                'caefff050a36c52cbc463eab75b6a31d', '7a57f2b24d51a22d76d3f9df996a1a98',
-                '68666720352f90cec83ad6691b3777e3', 'f0db6152b170ce7b5bec9a29aee71597']
+API_KEY_LIST = [...]
 INDEX = 0
 
 f = open('API_LOG.txt', 'w')

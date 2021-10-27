@@ -12,7 +12,7 @@ def jusoAPI(keystr):
         url = 'http://www.juso.go.kr/addrlink/addrLinkApi.do'
         queryParams = '?' + urlencode(
             {quote_plus('currentPage'): '1', quote_plus('countPerPage'): '1', quote_plus('resultType'): 'json',
-             quote_plus('keyword'): addr, quote_plus('confmKey'): 'devU01TX0FVVEgyMDIxMTAwMjIzNDkxMzExMTcxNDg='})
+             quote_plus('keyword'): addr, quote_plus('confmKey'): '...'})
         while True:
             try:
                 request = Request(url + queryParams)

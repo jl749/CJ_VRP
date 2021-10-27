@@ -8,7 +8,7 @@ import requests
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
-API_KEY = '62e08eb099c720a9a6b8ce429285b169'
+API_KEY = '...'
 
 with open('cor_dict.pkl', 'rb') as f:
     COR_DICT = pickle.load(f)

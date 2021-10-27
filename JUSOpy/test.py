@@ -8,7 +8,7 @@ def jusoAPI(keystr):
     url = 'http://www.juso.go.kr/addrlink/addrLinkApi.do'
     queryParams = '?' + urlencode(
         {quote_plus('currentPage'): '1', quote_plus('countPerPage'): '1', quote_plus('resultType'): 'json',
-         quote_plus('keyword'): keystr, quote_plus('confmKey'): 'devU01TX0FVVEgyMDIxMTAwMjIzNDkxMzExMTcxNDg='})
+         quote_plus('keyword'): keystr, quote_plus('confmKey'): '...'})
     request = Request(url + queryParams)
     request.get_method = lambda: 'GET'  # default GET anyway
     response_body = urlopen(request).read()
